@@ -1,0 +1,93 @@
+## Sample DockerFile
+
+FROM ubuntu:22.04
+
+RUN apt update
+
+RUN apt install -y nginx
+
+CMD ["nginx", "-g", "daemon off;"]
+
+
+## Difference between the ENTRYPOINT and CMD command
+CMD ["echo", "Hello"] in a DockerFile
+
+''
+FROM ubuntu:22.04
+CMD ["echo", "Hello"]
+''
+
+- docker run <image_name> will print "Hello"
+- docker run <image_name> echo "Hi" will print "Hi" instead of "Hello"
+
+ENTRYPOINT ["ping"] in a DockerFile
+''
+FROM ubuntu:22.04
+ENTRYPOINT ["ping"]
+''
+
+- docker run <image_name> google.com
+- prints "ping google"
+
+ENTRYPOINT + CMD Together
+''
+FROM ubuntu:22.04
+ENTRYPOINT ["ping"]
+CMD ["localhost"]
+''
+
+- docker run <image_name>
+- prints "ping localhost"
+
+## simple dockerfile showing difference between ADD and COPY command
+
+COPY
+''
+FROM ubuntu:22.04
+COPY ./file.txt /tmp/file.txt
+CMD ["tail", "-f", "/dev/null"]
+''
+- docker build -t copy-example .
+- docker run copy-example cat /tmp/file.txt
+
+
+ADD
+''  
+FROM ubuntu:22.04
+ADD ./file.txt /tmp/file.txt
+CMD ["tail", "-f", "/dev/null"]
+''
+- docker build -t add-example .
+- docker run add-example cat /tmp/file.txt
+
+sudo usermod -aG docker ec2-user
+newgrp docker
+
+ADD
+''
+FROM ubuntu:22.04
+ADD https://www.google.com /tmp/google.html
+CMD ["tail", "-f", "/dev/null"]
+''
+
+# The ADD & COPY command will automatically create /tmp/google.html if it doesn't exist
+
+- docker build -t add-example .
+- docker run add-example cat /tmp/google.html
+
+## DEMO 
+- Step 1: Install Docker
+sudo dnf install -y docker
+
+- Step 2: Start Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
+
+- Step 3: Add your user to docker group (so you don't need sudo every time) and refresh group to effect the changes
+# command 1 - adds ec2-user to the docker group
+sudo usermod -aG docker ec2-user
+
+# command 2 - refreshes your group membership without logging out
+newgrp docker
+
+- 
