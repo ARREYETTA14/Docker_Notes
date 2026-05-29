@@ -90,4 +90,128 @@ sudo usermod -aG docker ec2-user
 # command 2 - refreshes your group membership without logging out
 newgrp docker
 
-- 
+## Docker Compose Template
+- Install Docker and Docker Compose
+sudo dnf install -y docker docker-compose-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+
+- Put your compose file in a directory, e.g. ~/jira/docker-compose.yml. for best practices
+- Start the stack
+cd ~/jira
+docker compose up -d
+
+- Check status of cotnainer:
+docker compose ps
+docker compose logs -f jira
+docker compose port jira 8080 # Show ports for a specific service
+docker inspect <container_name_or_id> # Show detailed info for a container
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" # If you want a quick table
+
+- Stop/remove:
+docker compose down
+
+version: '3.8'
+services:
+  jira:
+    image: atlassian/jira-software:10.0.0  # Pull the latest Jira Software image
+    restart: unless-stopped # makes the stack recover after reboot.
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    volumes:
+      - jira-data:/var/atlassian/jira
+    environment:
+      - ATL_JDBC_URL=jdbc:postgresql://db/jiradb
+      - ATL_JDBC_USER=jirauser
+      - ATL_JDBC_PASSWORD=jirapassword
+
+  db:
+    image: postgres:14
+    restart: unless-stopped # makes the stack recover after reboot.
+    environment:
+      - POSTGRES_DB=jiradb
+      - POSTGRES_USER=jirauser
+      - POSTGRES_PASSWORD=jirapassword
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  jira-data:
+  db-data:
+
+n your docker-compose.yml, this line is a volume mapping.
+
+db-data is the name of a Docker volume.
+/var/lib/postgresql/data is the path inside the db container where PostgreSQL stores its database files.
+So this means:
+
+PostgreSQL writes its data into /var/lib/postgresql/data
+Docker stores that data in a persistent named volume called db-data on your Docker Host
+
+Why it matters?
+Your database data survives container restarts.
+If the db container is removed, the actual database files remain in db-data.
+You can later reattach the same volume to a new db container and keep your data.
+
+# simple approach to protect sensitive data
+
+Step 1: Create a .env file
+Create .env in the same folder as docker-compose.yml:
+
+POSTGRES_DB=jiradb
+POSTGRES_USER=jirauser
+POSTGRES_PASSWORD=jirapassword
+JIRA_DB_USER=jirauser
+JIRA_DB_PASSWORD=jirapassword
+
+Step 2: Update docker-compose.yml
+Use variable substitution instead of hardcoded secrets:
+
+version: "3.8"
+
+services:
+  jira:
+    image: atlassian/jira-software:10.0.0
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    volumes:
+      - jira-data:/var/atlassian/jira
+    environment:
+      - ATL_JDBC_URL=jdbc:postgresql://db/${POSTGRES_DB}
+      - ATL_JDBC_USER=${JIRA_DB_USER}
+      - ATL_JDBC_PASSWORD=${JIRA_DB_PASSWORD}
+
+  db:
+    image: postgres:14
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  jira-data:
+  db-data:
+
+Step 3: Run Docker Compose
+
+cd /path/to/your/project
+docker compose config
+docker compose up -d
+
+docker compose config checks the file and resolves the variables. Allowing Docker Compose to automatically read a .env file from the same folder as docker-compose.yml and substitute values into the compose file.
+
+Why this is better
+docker-compose.yml stays reusable and safe.
+Secrets are kept in .env, which stays local.
+You can change passwords without editing the compose file.
+If you share the compose file, no secret values leak.
+
+
