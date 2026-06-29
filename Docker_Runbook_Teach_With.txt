@@ -2,7 +2,7 @@
 
 FROM ubuntu:22.04
 
-RUN apt update
+RUN apt update # like a user data works  
 
 RUN apt install -y nginx
 
@@ -38,6 +38,8 @@ CMD ["localhost"]
 
 - docker run <image_name>
 - prints "ping localhost"
+
+
 
 ## simple dockerfile showing difference between ADD and COPY command
 
@@ -75,6 +77,8 @@ CMD ["tail", "-f", "/dev/null"]
 - docker build -t add-example .
 - docker run add-example cat /tmp/google.html
 
+
+
 ## DEMO 
 - Step 1: Install Docker
 sudo dnf install -y docker
@@ -89,6 +93,75 @@ sudo usermod -aG docker ec2-user
 
 # command 2 - refreshes your group membership without logging out
 newgrp docker
+
+
+## Port forwarding example
+
+- DockerFile
+FROM ubuntu:22.04
+
+RUN apt update # like a user data works  
+
+RUN apt install -y nginx
+
+CMD ["nginx", "-g", "daemon off;"]
+
+- - # build the image
+docker build -t my-nginx .
+
+- # run with port mapping  -p <host-port>:<container-port>
+docker run -d -p 80:80 my-nginx
+
+
+
+## Example of persistent volumes
+
+- # build the image
+docker build -t my-nginx .
+
+- # create me volume
+docker volume create my-data
+
+- # run container and mount the volume
+docker run -d -p 80:80 -v my-data:/var/www/html my-nginx
+
+- # run container with a name and mount the volume
+docker run -d --name my-nginx-container -p 80:80 -v my-data:/var/www/html my-nginx
+
+# confirm volume was created
+docker volume ls
+
+# confirm volume is mounted on the container
+docker inspect my-nginx
+
+
+When the container restarts, the volume data is safe and still there because the volume lives independently on the EC2 host — but by default Docker won't automatically restart the container if it stops or the EC2 reboots.
+
+To handle automatic restarts, add --restart policy to your docker run:
+
+docker run -d --name my-nginx-container -p 80:80 -v my-data:/var/www/html --restart unless-stopped my-nginx
+
+--restart no               → never restart (default)
+--restart always           → always restart, even after EC2 reboot
+--restart unless-stopped   → restart always EXCEPT if you manually stopped it (recommended)
+--restart on-failure       → only restart if container crashed with an error
+
+You can prove this to your students with a quick demo:
+
+# Step 1 - create and run container, add a file to the volume
+docker run -d --name my-nginx-container -p 80:80 -v my-data:/var/www/html my-nginx
+docker exec my-nginx-container bash -c "echo 'hello' > /var/www/html/test.txt"
+
+# Step 2 - delete the container
+docker rm -f my-nginx-container
+
+# Step 3 - create a new container with same volume
+docker run -d --name my-nginx-container-2 -p 80:80 -v my-data:/var/www/html my-nginx
+
+# Step 4 - file is still there ✅
+docker exec my-nginx-container-2 cat /var/www/html/test.txt
+# output: hello
+
 
 ## Docker Compose Template
 - Install Docker and Docker Compose
